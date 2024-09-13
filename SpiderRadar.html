@@ -1,12 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Grafico a Pentagono con QI</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;700&family=Raleway:wght@400;700&display=swap');
-
     body {
       display: flex;
       flex-direction: column;
@@ -14,8 +12,8 @@
       align-items: center;
       height: 100vh;
       margin: 0;
-      font-family: 'Kanit', sans-serif;
-      background-color: #111111;
+      font-family: Arial, sans-serif;
+      background-color: #1c1c1c;
       color: #ffffff;
     }
 
@@ -30,7 +28,7 @@
 
     #qi-display {
       margin-top: 20px;
-      font-size: 2rem;
+      font-size: 1.5rem;
       color: #ffffff;
     }
 
@@ -42,7 +40,7 @@
       border: none;
       border-radius: 30px;
       cursor: pointer;
-      font-size: 1.5rem;
+      font-size: 1.2rem;
       box-shadow: 8px 8px 16px #0d0d0d, -8px -8px 16px #2a2a2a;
       transition: background-color 0.3s ease, box-shadow 0.3s ease;
     }
@@ -51,7 +49,6 @@
       background: linear-gradient(135deg, #ff00ff, #00ffff);
       box-shadow: 5px 5px 15px #0d0d0d, -5px -5px 15px #3a3a3a;
     }
-
   </style>
 </head>
 <body>
@@ -64,9 +61,8 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, doc, setDoc, orderBy } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
 
-     // Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyDYtLmrzqTcZXxd5LDGSkJs76VzE0dvtBY",
       authDomain: "qi-tester-game.firebaseapp.com",
@@ -170,6 +166,7 @@
         ctx.font = '14px Arial';
         ctx.fillStyle = '#ffffff';
         ctx.fillText(skillLabels[i], labelX - 20, labelY);
+
         ctx.fillText(`IQ: ${playerScores[i]}`, labelX - 20, labelY + 15);
       }
     }
@@ -195,62 +192,54 @@
       }, { merge: true });
     }
 
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        console.log("User is authenticated.");
-        fetchScoresFromFirebase(user);
-      } else {
-        signInAnonymously(auth)
-          .then(() => {
-            console.log("User authenticated anonymously.");
-            fetchScoresFromFirebase(auth.currentUser);
-          })
-          .catch((error) => {
-            console.error("Error during anonymous authentication:", error);
+    function fetchScoresFromFirebase() {
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          const userId = user.uid;
+          const scoresRef = collection(db, 'qi_scores');
+
+          const q = query(
+            scoresRef,
+            where('userId', '==', userId),
+            where('game', 'in', skillLabels),
+            orderBy('timestamp', 'desc')
+          );
+
+          const querySnapshot = await getDocs(q);
+          const tempScores = {};
+
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            const game = data.game;
+            const gameIndex = skillLabels.indexOf(game);
+
+            if (gameIndex !== -1) {
+              if (!tempScores[game]) {
+                tempScores[game] = data.qi;
+              }
+            }
           });
-      }
-    });
 
-    function fetchScoresFromFirebase(user) {
-      const userId = user.uid;
-      const scoresRef = collection(db, 'qi_scores');
-
-      const q = query(
-        scoresRef,
-        where('userId', '==', userId),
-        where('game', 'in', skillLabels),
-        orderBy('timestamp', 'desc')
-      );
-
-      getDocs(q).then((querySnapshot) => {
-        const tempScores = {};
-
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          const game = data.game;
-          const gameIndex = skillLabels.indexOf(game);
-
-          if (gameIndex !== -1) {
-            tempScores[game] = data.qi;
+          for (let game in tempScores) {
+            const gameIndex = skillLabels.indexOf(game);
+            if (gameIndex !== -1) {
+              playerScores[gameIndex] = tempScores[game];
+            }
           }
-        });
 
-        for (let game in tempScores) {
-          const gameIndex = skillLabels.indexOf(game);
-          if (gameIndex !== -1) {
-            playerScores[gameIndex] = tempScores[game];
-          }
+          console.log("Player Scores aggiornati:", playerScores);
+          drawChart();
+        } else {
+          console.error("User is not authenticated.");
         }
-
-        drawChart();
-      }).catch((error) => {
-        console.error("Error fetching scores:", error);
       });
     }
 
     backButton.addEventListener('click', function () {
       window.location.href = 'index.html';
     });
+
+    fetchScoresFromFirebase();
     
   </script>
 
